@@ -3,7 +3,7 @@ package examples
 import (
 	"encoding/json"
 	"github.com/kataras/golog"
-	"go-skolengo/skolengo"
+	"github.com/mateo08c/go-skolengo/skolengo"
 	"net/http"
 	"os"
 	"strings"
