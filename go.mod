@@ -1,4 +1,4 @@
-module go-skolengo
+module github.com/mateo08c/go-skolengo
 
 go 1.20
 
