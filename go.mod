@@ -1,6 +1,6 @@
 module github.com/mateo08c/go-skolengo
 
-go 1.18
+go 1.20
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
@@ -18,5 +18,3 @@ require (
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 )
-
-replace github.com/mateo08c/go-skolengo => ./skolengo
