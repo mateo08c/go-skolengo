@@ -1,4 +1,4 @@
-module github.com/mateo08c/go-skolengo
+module github.com/mateo08c/go-skolengo/skolengo
 
 go 1.18
 
