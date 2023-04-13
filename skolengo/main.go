@@ -1,9 +1,9 @@
 package skolengo
 
-func NewClient(seleniumURL string) (*Client, error) {
+func NewClient(username string, password string) (*Client, error) {
 	return &Client{
-		SeleniumURL: seleniumURL,
-
+		Username:  username,
+		Password:  password,
 		AutoLogin: true,
 	}, nil
 }

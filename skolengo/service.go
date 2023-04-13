@@ -6,6 +6,7 @@ import (
 	"github.com/kataras/golog"
 	"github.com/mateo08c/go-skolengo/skolengo/components/inbox"
 	"github.com/mateo08c/go-skolengo/skolengo/components/user"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -13,31 +14,35 @@ import (
 )
 
 type Service struct {
-	Name       string
-	URL        *url.URL
-	Default    bool
-	Properties ServiceProperties
+	Name   string
+	URL    *url.URL
+	Cookie []*http.Cookie
 }
 
-type ServiceProperties struct {
-	Inbox    bool
-	TextBook bool
-	Workbook bool
+func (s *Service) Get(u *url.URL) (*http.Response, error) {
+	client := http.Client{}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, cookie := range s.Cookie {
+		req.AddCookie(cookie)
+	}
+	return client.Do(req)
 }
 
-func NewService(name string, url *url.URL) *Service {
-	//garder juste le nom de domaine
-	url.RawQuery = ""
-	url.Fragment = ""
+func NewService(name string, cookies []*http.Cookie, url *url.URL) *Service {
 	url.Path = ""
+	url.RawQuery = ""
 
 	return &Service{
-		Name: name,
-		URL:  url,
+		Name:   name,
+		URL:    url,
+		Cookie: cookies,
 	}
 }
 
-func (s *Service) GetUID(client *Client) (*string, error) {
+func (s *Service) GetUID() (*string, error) {
 	builderFiche := NewURLBuilder(s.URL)
 	builderFiche.SetPath("/kdecole/activation_service.jsp") //This url redirect to the right url
 	builderFiche.AddParam("service", "FICHE_ELEVE")
@@ -46,7 +51,7 @@ func (s *Service) GetUID(client *Client) (*string, error) {
 		return nil, err
 	}
 
-	resp, err := client.Get(u)
+	resp, err := s.Get(u)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +79,7 @@ func (s *Service) GetInbox(client *Client) (*inbox.Inbox, error) {
 		return nil, err
 	}
 
-	resp, err := client.Get(u)
+	resp, err := s.Get(u)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +141,7 @@ func (s *Service) GetMessages(client *Client) ([]*inbox.Message, error) {
 			return
 		}
 
-		get, err := client.Get(u)
+		get, err := s.Get(u)
 		if err != nil {
 			return
 		}
@@ -169,7 +174,7 @@ func (s *Service) GetFolderID(client *Client) (string, error) {
 		return "", err
 	}
 
-	resp, err := client.Get(u)
+	resp, err := s.Get(u)
 	if err != nil {
 		return "", err
 	}
@@ -185,7 +190,7 @@ func (s *Service) GetFolderID(client *Client) (string, error) {
 	return folderIDVal, nil
 }
 
-func (s *Service) GetInfos(client *Client) (*user.Info, error) {
+func (s *Service) GetInfos() (*user.Info, error) {
 	start := time.Now()
 
 	builderCord := NewURLBuilder(s.URL)
@@ -196,7 +201,7 @@ func (s *Service) GetInfos(client *Client) (*user.Info, error) {
 		return nil, err
 	}
 
-	resp, err := client.Get(u)
+	resp, err := s.Get(u)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +280,7 @@ func (s *Service) GetInfos(client *Client) (*user.Info, error) {
 		return nil, err
 	}
 
-	resp, err = client.Get(u)
+	resp, err = s.Get(u)
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +361,7 @@ func (s *Service) GetInfos(client *Client) (*user.Info, error) {
 		return nil, err
 	}
 
-	resp, err = client.Get(u)
+	resp, err = s.Get(u)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +390,7 @@ func (s *Service) GetInfos(client *Client) (*user.Info, error) {
 		return nil, err
 	}
 
-	resp, err = client.Get(u)
+	resp, err = s.Get(u)
 	if err != nil {
 		return nil, err
 	}
