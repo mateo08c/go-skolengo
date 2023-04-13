@@ -20,11 +20,16 @@ func Start() {
 	}
 
 	for _, service := range services {
-		infos, err := service.GetInfos()
+		messages, err := service.GetMessages(10)
 		if err != nil {
+			golog.Error(err)
 			return
 		}
 
-		golog.Info(infos)
+		for _, message := range messages {
+			golog.Infof("Message: %s - %s", message.ID, message.Subject)
+		}
 	}
+
+	golog.Info("Done")
 }

@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	MonBureauNumeriqueHomeURL          = "https://www.monbureaunumerique.fr"
-	MonBureauNumeriqueLoginURlRedirect = "https://cas.monbureaunumerique.fr/login?service=https%3A%2F%2Flyc-monge.monbureaunumerique.fr%2Fsg.do%3FPROC%3DMESSAGERIE"
+	MonBureauNumeriqueHomeURL = "https://www.monbureaunumerique.fr"
 )
 
 type Client struct {

@@ -2,6 +2,7 @@ package skolengo
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/kataras/golog"
 	"github.com/mateo08c/go-skolengo/skolengo/components/inbox"
@@ -20,8 +21,21 @@ type Service struct {
 }
 
 func (s *Service) Get(u *url.URL) (*http.Response, error) {
+	golog.Debug("GET: ", u.String())
 	client := http.Client{}
 	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, cookie := range s.Cookie {
+		req.AddCookie(cookie)
+	}
+	return client.Do(req)
+}
+
+func (s *Service) Post(u *url.URL) (*http.Response, error) {
+	client := http.Client{}
+	req, err := http.NewRequest("POST", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +81,18 @@ func (s *Service) GetUID() (*string, error) {
 	return &uidVal, nil
 }
 
-func (s *Service) GetInbox(client *Client) (*inbox.Inbox, error) {
+func (s *Service) GetInbox() (*inbox.Inbox, error) {
+	//before get information, we need to get first time the inbox
+	err := s.InitInbox()
+	if err != nil {
+		return nil, errors.New("error while init inbox")
+	}
+
 	builder := NewURLBuilder(s.URL)
 	builder.SetPath("sg.do")
-	builder.AddParam("PROC", "MESSAGERIE")
 	builder.AddParam("ACTION", "UPDATE_PAGINATION")
 	builder.AddParam("FROM_AJAX", "true")
+	builder.AddParam("PROC", "MESSAGERIE")
 
 	u, err := builder.Build()
 	if err != nil {
@@ -93,9 +113,29 @@ func (s *Service) GetInbox(client *Client) (*inbox.Inbox, error) {
 	return &infos, nil
 }
 
-func (s *Service) GetMessages(client *Client) ([]*inbox.Message, error) {
+func (s *Service) InitInbox() error {
+	builder := NewURLBuilder(s.URL)
+	builder.SetPath("sg.do")
+	builder.AddParam("PROC", "MESSAGERIE")
+
+	u, err := builder.Build()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Get(u)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetMessages return the messages of the inbox
+// if max is -1, it will return all messages
+func (s *Service) GetMessages(max int) ([]*inbox.Message, error) {
 	start := time.Now()
-	i, err := s.GetInbox(client)
+	i, err := s.GetInbox()
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +153,7 @@ func (s *Service) GetMessages(client *Client) ([]*inbox.Message, error) {
 		return nil, err
 	}
 
-	resp, err := client.Post(u)
+	resp, err := s.Post(u)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +165,10 @@ func (s *Service) GetMessages(client *Client) ([]*inbox.Message, error) {
 
 	var messages []*inbox.Message
 	doc.Find("#js_boite_reception li").Each(func(i int, se *goquery.Selection) {
+		if max != -1 && i >= max {
+			return
+		}
+
 		href, _ := se.Find("a").Attr("href")
 		//parse href
 		u, err := url.Parse(href)
