@@ -8,41 +8,6 @@ type UrlBuilder struct {
 	URL *url.URL
 }
 
-func (s *Service) MessageContentURL(folderID string, messageID string) (*url.URL, error) {
-	builder := NewURLBuilder(s.URL)
-	builder.SetPath("sg.do")
-	builder.AddParam("PROC", "MESSAGERIE")
-	builder.AddParam("ACTION", "CONSULTER_COMMUNICATION")
-	builder.AddParam("ID_DOSSIER", folderID)
-	builder.AddParam("ID_COMMUNICATION", messageID)
-
-	return builder.Build()
-}
-
-func (s *Service) MessageRecipientURL(messageID string) (*url.URL, error) {
-	builder := NewURLBuilder(s.URL)
-	builder.SetPath("sg.do")
-	builder.AddParam("PROC", "MESSAGERIE")
-	builder.AddParam("ACTION", "LISTER_DESTINATAIRES_GROUPE")
-	builder.AddParam("ID_COMMUNICATION", messageID)
-	return builder.Build()
-}
-
-func (s *Service) PeriodUrl() (*url.URL, error) {
-	builder := NewURLBuilder(s.URL)
-	builder.SetPath("sg.do")
-	builder.AddParam("PROC", "CDT_AFFICHAGE")
-	builder.AddParam("VUE", "E")
-	return builder.Build()
-}
-
-func (s *Service) MessagerieURL() (*url.URL, error) {
-	builder := NewURLBuilder(s.URL)
-	builder.SetPath("sg.do")
-	builder.AddParam("PROC", "MESSAGERIE")
-	return builder.Build()
-}
-
 func NewURLBuilder(u *url.URL) *UrlBuilder {
 	clone := *u
 	return &UrlBuilder{

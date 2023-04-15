@@ -15,9 +15,13 @@ import (
 )
 
 type Service struct {
-	Name   string
-	URL    *url.URL
-	Cookie []*http.Cookie
+	Name    string
+	URL     *url.URL
+	Cookies []*http.Cookie
+}
+
+func (s *Service) GetCookies() []*http.Cookie {
+	return s.Cookies
 }
 
 func (s *Service) Get(u *url.URL) (*http.Response, error) {
@@ -27,7 +31,7 @@ func (s *Service) Get(u *url.URL) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, cookie := range s.Cookie {
+	for _, cookie := range s.Cookies {
 		req.AddCookie(cookie)
 	}
 	return client.Do(req)
@@ -39,7 +43,7 @@ func (s *Service) Post(u *url.URL) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, cookie := range s.Cookie {
+	for _, cookie := range s.Cookies {
 		req.AddCookie(cookie)
 	}
 	return client.Do(req)
@@ -50,9 +54,9 @@ func NewService(name string, cookies []*http.Cookie, url *url.URL) *Service {
 	url.RawQuery = ""
 
 	return &Service{
-		Name:   name,
-		URL:    url,
-		Cookie: cookies,
+		Name:    name,
+		URL:     url,
+		Cookies: cookies,
 	}
 }
 
@@ -153,6 +157,8 @@ func (s *Service) GetMessages(max int) ([]*inbox.Message, error) {
 		return nil, err
 	}
 
+	golog.Debugf(u.String())
+
 	resp, err := s.Post(u)
 	if err != nil {
 		return nil, err
@@ -170,6 +176,7 @@ func (s *Service) GetMessages(max int) ([]*inbox.Message, error) {
 		}
 
 		href, _ := se.Find("a").Attr("href")
+
 		//parse href
 		u, err := url.Parse(href)
 		if err != nil {
@@ -208,7 +215,7 @@ func (s *Service) GetMessages(max int) ([]*inbox.Message, error) {
 	return messages, nil
 }
 
-func (s *Service) GetFolderID(client *Client) (string, error) {
+func (s *Service) GetFolderID() (string, error) {
 	builder := NewURLBuilder(s.URL)
 	builder.SetPath("sg.do")
 	builder.AddParam("PROC", "MESSAGERIE")
@@ -362,10 +369,9 @@ func (s *Service) GetInfos() (*user.Info, error) {
 		name := s.Find("a.js-tuteur__lien").Text()
 		split := strings.Split(name, " ")
 
-		d := strings.Split(name, ".")
-		if len(d) != 0 {
-			switch gender {
-			case "M":
+		if len(split) != 0 {
+			switch split[0] {
+			case "M.":
 				gender = "Monsieur"
 			case "Mme":
 				gender = "Madame"
@@ -455,235 +461,6 @@ func (s *Service) GetInfos() (*user.Info, error) {
 
 	return infos, nil
 }
-
-//
-//func (c *Client) DownloadAttachment(service *Service, attachment *inbox.Attachment) error {
-//	resp, err := c.NewRequest("GET", attachment.GetUrl(service.LoginURL.String()), nil)
-//	if err != nil {
-//		return err
-//	}
-//
-//	if resp.StatusCode != 200 {
-//		return fmt.Errorf("cookie is not valid")
-//	}
-//
-//	attachment.Data, err = io.ReadAll(resp.Body)
-//	attachment.Size = len(attachment.Data)
-//
-//	return nil
-//}
-//
-//func (c *Client) ScrapPeriods(service *Service) ([]*calendar.Period, error) {
-//	e, err := c.PeriodUrl(service)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	request, err := c.NewRequest("GET", e.String(), nil)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	doc, err := goquery.NewDocumentFromReader(request.Body)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	find := doc.Find(".content-filter optgroup option")
-//	id, exist := find.Attr("value")
-//	if !exist {
-//		return nil, errors.New("no periods found")
-//	}
-//	id = strings.Replace(id, "$CL$", "", 1)
-//
-//	client := &http.Client{}
-//	path, err := url.JoinPath(service.LoginURL.String(), "sg.do")
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	req, err := http.NewRequest("GET", path, nil)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	weekStart := time.Now().AddDate(0, 0, -int(time.Now().Weekday()))
-//	weekEnd := weekStart.AddDate(0, 0, 6)
-//
-//	q := req.LoginURL.Query()
-//	q.Add("PROC", "CDT_AFFICHAGE")
-//	q.Add("ACTION", "AFFICHER")
-//	q.Add("personalView", "false")
-//	q.Add("valid", "true")
-//	q.Add("view", "CALENDAR")
-//	q.Add("resourceCode", id)
-//	q.Add("dateCourante", time.Now().Format("02/01/2006"))
-//	q.Add("typeAgenda", "CDT_CLASSE")
-//	q.Add("startsFrom", "WEEK_START")
-//
-//	q.Add("dateDebut", weekStart.Format("02/01/2006"))
-//	q.Add("dateFin", weekEnd.Format("02/01/2006"))
-//
-//	req.LoginURL.RawQuery = q.Encode()
-//
-//	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-//	req.Header.Add("cookie", c.GetCookiesString())
-//	resp, err := client.Do(req)
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer resp.Body.Close()
-//
-//	s, err := goquery.NewDocumentFromReader(resp.Body)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	var periods []*calendar.Period
-//	s.Find(".scheduler__events-overlay .scheduler__card").Each(func(i int, s *goquery.Selection) {
-//		subject := s.Find(".scheduler__card-title").Text()
-//		teacher := s.Find(".scheduler__card-teacher").Text()
-//		classroom := s.Find(".scheduler__card-footer .flex-align--both-row span").Text()
-//		start, _ := s.Attr("data-start-date")
-//		end, _ := s.Attr("data-end-date")
-//		cancelled := strings.Contains(s.Find(".scheduler__card-body span").Text(), "Annulée")
-//		id, _ := s.Attr("data-scheduler-eventid")
-//
-//		periods = append(periods, &calendar.Period{
-//			ID:        id,
-//			Subject:   subject,
-//			Teacher:   teacher,
-//			Room:      classroom,
-//			Start:     calendar.TimestampToTime(start),
-//			End:       calendar.TimestampToTime(end),
-//			Cancelled: cancelled,
-//		})
-//
-//	})
-//
-//	return periods, nil
-//}
-//
-//func (c *Client) ScrapMessages() ([]*inbox.Message, error) {
-//	u, err := c.MessagerieURL(service)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	resp, err := c.NewRequest("GET", u.String(), nil)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	doc, err := goquery.NewDocumentFromReader(resp.Body)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	var messages []*inbox.Message
-//	doc.Find("#js_boite_reception").Each(func(i int, s *goquery.Selection) {
-//		s.Find("li").Each(func(i int, s *goquery.Selection) {
-//			subject := s.Find(".text--ellipsis.js-consulterMessage").Text()
-//			sender := s.Find("div:nth-child(1) .text--ellipsis span:nth-child(7)").Text()
-//			ty := strings.ToLower(s.Find("div:nth-child(3)").Text())
-//			groups := s.Find(".text--slate-dark")
-//
-//			//try to get content information
-//			u, _ := s.Find("div:nth-child(2) a").Attr("href")
-//			uu, _ := url.Parse(u)
-//
-//			msgID := uu.Query().Get("ID_COMMUNICATION")
-//			folderID := uu.Query().Get("ID_DOSSIER")
-//
-//			message := inbox.NewMessage(folderID, msgID)
-//			message.SetSubject(subject)
-//			message.SetSender(sender)
-//			message.SetType(ty)
-//			message.SetServiceURL(service.Url.String())
-//
-//			groups.Each(func(i int, s *goquery.Selection) {
-//				message.AddGroup(s.Text())
-//			})
-//
-//			d, err := c.MessageContentURL(folderID, msgID, service)
-//			if err != nil {
-//				golog.Infof("error while getting message content url: %v", err)
-//				return
-//			}
-//			resp, err := c.NewRequest("GET", d.String(), nil)
-//			if err != nil {
-//				return
-//			}
-//
-//			msg, err := goquery.NewDocumentFromReader(resp.Body)
-//			if err != nil {
-//				golog.Infof("error while parsing message: %v", err)
-//				return
-//			}
-//
-//			tt := msg.Find("#discussion_message0 .col time")
-//			datetime, _ := tt.Attr("datetime")
-//
-//			//2023-03-15T08:46:40.000+01:00
-//			t, _ := time.Parse("2006-01-02T15:04:05.000-07:00", datetime)
-//			message.SetDate(&t)
-//
-//			content := msg.Find("#discussion_message0 .wysiwyg")
-//
-//			selection := content.Find(".jumbofiles .jumbofiles__files li")
-//			selection.Each(func(i int, s *goquery.Selection) {
-//				name := s.Find(".jumbofiles__file-name").Text()
-//				u, _ := s.Find(".js-jumbofiles__file-url").Attr("href")
-//				size := s.Find(".js-jumbofiles__file-size").Text()
-//				extension := s.Find(".js-jumbofiles__file-extension").Text()
-//
-//				ss, err := strconv.Atoi(size)
-//				if err != nil {
-//					ss = 0
-//				}
-//
-//				uu, _ := url.Parse(u)
-//				attID := uu.Query().Get("ID_FICHIER")
-//
-//				att := inbox.NewAttachment(msgID, attID)
-//				att.SetName(name)
-//				att.SetSize(ss)
-//				att.SetExtension(extension)
-//
-//				message.AddAttachment(att)
-//			})
-//
-//			content.Find(".jumbofiles").Remove()
-//			content.Each(func(i int, s *goquery.Selection) {
-//				message.AddContent(s.Text())
-//			})
-//
-//			e, err := c.MessageRecipientURL(msgID, service)
-//			if err != nil {
-//				golog.Infof("error while getting message recipient url: %v", err)
-//				return
-//			}
-//			resp, err = c.NewRequest("GET", e.String(), nil)
-//			if err != nil {
-//				return
-//			}
-//
-//			msg, err = goquery.NewDocumentFromReader(resp.Body)
-//			if err != nil {
-//				golog.Infof("error while parsing message: %v", err)
-//				return
-//			}
-//
-//			msg.Find("li").Each(func(i int, s *goquery.Selection) {
-//				message.Recipient = append(message.Recipient, s.Text())
-//			})
-//			message.Clean()
-//			messages = append(messages, message)
-//		})
-//	})
-//
-//	return messages, nil
-//}
 
 func (s *Service) Id() string {
 	return strings.ToLower(strings.ReplaceAll(s.Name, " ", "-"))

@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-type MessageType string
-
 const (
 	MessageTypeInternal      MessageType = "internal"
 	MessageTypeExternal      MessageType = "external"
 	MessageTypeInstitutional MessageType = "institutional"
 )
+
+type MessageType string
 
 type Sender struct {
 	Name string `json:"name"`
@@ -28,7 +28,7 @@ type Message struct {
 	Content     string        `json:"content"`
 	Type        string        `json:"type"`
 	ServiceURL  string        `json:"service_url"`
-	Attachments []*Attachment `json:"-"`
+	Attachments []*Attachment `json:"attachments"`
 }
 
 func (m *Message) SetSubject(subject string) {

@@ -1,31 +1,26 @@
 package skolengo
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/kataras/golog"
-	"github.com/tebeka/selenium"
 	"net/http"
 	"net/url"
-	"os"
-)
-
-const (
-	MonBureauNumeriqueHomeURL = "https://www.monbureaunumerique.fr"
+	"time"
 )
 
 type Client struct {
 	Username string
 	Password string
 
-	AutoLogin bool
-
 	cookies []*http.Cookie
 }
 
+// GetServices return the list of services.
+// This method is used to log in
 func (c *Client) GetServices() ([]*Service, error) {
+	start := time.Now()
 	var services []*Service
 
 	client := http.Client{
@@ -121,6 +116,7 @@ func (c *Client) GetServices() ([]*Service, error) {
 		panic(err)
 	}
 
+	//Parse all the services
 	doc.Find(".msg .p-like a").Each(func(i int, s *goquery.Selection) {
 		href, exist := s.Attr("href")
 		u, err := url.Parse(href)
@@ -178,55 +174,9 @@ func (c *Client) GetServices() ([]*Service, error) {
 		services = append(services, NewService(name, resp.Cookies(), b))
 	})
 
+	golog.Debugf("GetServices took %s", time.Since(start))
+
 	return services, nil
-}
-
-func (c *Client) CheckCookieValidity() bool {
-	if len(c.cookies) == 0 {
-		return false
-	}
-
-	d, err := url.Parse(MonBureauNumeriqueHomeURL)
-	if err != nil {
-		return false
-	}
-
-	builder := NewURLBuilder(d)
-	builder.AddParam("PROC", "PAGE_ACCUEIL")
-	builder.AddParam("ACTION", "VALIDER")
-
-	u, err := builder.Build()
-	if err != nil {
-		return false
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return false
-	}
-
-	req.Header.Set("cookie", c.GetCookiesString())
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-
-	if resp.StatusCode != 200 {
-		return false
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return false
-	}
-
-	if doc.Find(".user").Length() == 0 {
-		return false
-	}
-
-	return true
 }
 
 func (c *Client) Post(u *url.URL) (*http.Response, error) {
@@ -250,32 +200,12 @@ func (c *Client) Post(u *url.URL) (*http.Response, error) {
 	return resp, nil
 }
 
-func GetServiceByID(services []*Service, id string) (*Service, error) {
-	for _, service := range services {
-		if service.Id() == id {
-			return service, nil
-		}
-	}
-	return nil, errors.New("service not found")
-}
-
-// SetAutoLogin enable function to check if the user is logged in on ALL requests
-// This methode is not recommended because it will make a request on every request and add a lot of time (20ms per request)
-func (c *Client) SetAutoLogin(autoLogin bool) {
-	c.AutoLogin = autoLogin
-}
-
 func (c *Client) SetUsername(u string) {
 	c.Username = u
 }
 
 func (c *Client) SetPassword(s string) {
 	c.Password = s
-}
-
-func (c *Client) GetCookiesJSON() (string, error) {
-	d, err := json.Marshal(c.cookies)
-	return string(d), err
 }
 
 func (c *Client) SetCookies(cs []*http.Cookie) {
@@ -292,19 +222,4 @@ func (c *Client) GetCookiesString() string {
 		s += fmt.Sprintf("%s=%s;", c.Name, c.Value)
 	}
 	return s
-}
-
-func Screenshot(driver selenium.WebDriver) error {
-	//create screenshot
-	screenshot, err := driver.Screenshot()
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create("screenshot.png")
-	if err != nil {
-		return err
-	}
-	_, err = f.Write(screenshot)
-	return err
 }

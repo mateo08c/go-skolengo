@@ -1,7 +1,5 @@
 package inbox
 
-import "encoding/json"
-
 type Attachment struct {
 	ID        string `json:"id"`
 	MessageID string `json:"message_id"`
@@ -32,12 +30,4 @@ func (a *Attachment) SetExtension(extension string) {
 
 func (a *Attachment) SetData(data []byte) {
 	a.Data = data
-}
-
-func (a *Attachment) UnmarshalBinary(data []byte) error {
-	return json.Unmarshal(data, a)
-}
-
-func (a *Attachment) MarshalBinary() ([]byte, error) {
-	return json.Marshal(a)
 }
