@@ -1,6 +1,6 @@
 # 🏫 go-skolengo
 
-Go-skolengo est un package qui vous permet de récupérer facilement une multitude d'informations depuis la plateforme Skolengo (aussi connue sous le nom de Mon bureau numérique ou Kdecole). Grâce à une authentification basée sur l'utilisateur et le mot de passe, ce package rend disponible le code pour votre application.
+Go-skolengo est un package qui vous permet de récupérer facilement une multitude d'informations depuis la plateforme Skolengo (aussi connue sous le nom de Mon bureau numérique ou Kdecole).
 
 [![wakatime](https://wakatime.com/badge/user/edc0f08e-3aca-4441-8b23-94a859fe119a/project/359c0ab2-2ba2-48c0-9044-5f27807f7e7c.svg)](https://wakatime.com/badge/user/edc0f08e-3aca-4441-8b23-94a859fe119a/project/359c0ab2-2ba2-48c0-9044-5f27807f7e7c)
 
@@ -16,11 +16,10 @@ Go-skolengo est un package qui vous permet de récupérer facilement une multitu
 
 ## Utilisation
 
-Pour utiliser go-skolengo, il vous suffit d'installer le package et d'ajouter les informations d'authentification de votre compte Skolengo. Ensuite, vous pouvez facilement récupérer les informations que vous souhaitez depuis Skolengo.
+Pour utiliser go-skolengo, il vous suffit d'installer le package et d'ajouter les informations d'authentification de votre compte. Ensuite, vous pouvez facilement récupérer les informations que vous souhaitez.
 
-Voici un exemple de code pour récupérer les messages depuis Skolengo :
-
-```go
+Voici un exemple de code pour récupérer les messages :
+```GO
 import "github.com/mateo08c/go-skolengo/skolengo"
 
 func main() {
@@ -49,5 +48,11 @@ func main() {
 }
 ```
 
+# Explications
+1. [ ] TODO : Ajouter des explications sur le code 🥸
+
 # Contribuer
-Si vous souhaitez contribuer à go-skolengo, n'hésitez pas à nous envoyer une pull request.
+Si vous souhaitez contribuer à **go-skolengo**, n'hésitez pas à nous envoyer une pull request.
+
+## Crédits
+- [Mateo](https://github.com/mateo08c) - Développeur principal
