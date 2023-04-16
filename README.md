@@ -3,7 +3,7 @@
 Go-skolengo est un package qui vous permet de récupérer facilement une multitude d'informations depuis la plateforme Skolengo (aussi connue sous le nom de Mon bureau numérique ou Kdecole).
 
 [![wakatime](https://wakatime.com/badge/user/edc0f08e-3aca-4441-8b23-94a859fe119a/project/359c0ab2-2ba2-48c0-9044-5f27807f7e7c.svg)](https://wakatime.com/badge/user/edc0f08e-3aca-4441-8b23-94a859fe119a/project/359c0ab2-2ba2-48c0-9044-5f27807f7e7c)
-[![Visitor Count](https://komarev.com/ghpvc/?username=go-skolengoc&style=flat-square)]()
+[![Visitor Count](https://komarev.com/ghpvc/?username=go-skolengoc&style=flat)]()
 
 ## Fonctionnalités
 
