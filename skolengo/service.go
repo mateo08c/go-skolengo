@@ -7,6 +7,7 @@ import (
 	"github.com/kataras/golog"
 	"github.com/mateo08c/go-skolengo/skolengo/components/inbox"
 	"github.com/mateo08c/go-skolengo/skolengo/components/user"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -38,6 +39,7 @@ func (s *Service) Get(u *url.URL) (*http.Response, error) {
 }
 
 func (s *Service) Post(u *url.URL) (*http.Response, error) {
+	golog.Debug("POST: ", u.String())
 	client := http.Client{}
 	req, err := http.NewRequest("POST", u.String(), nil)
 	if err != nil {
@@ -137,18 +139,24 @@ func (s *Service) InitInbox() error {
 
 // GetMessages return the messages of the inbox
 // if max is -1, it will return all messages
-func (s *Service) GetMessages(max int) ([]*inbox.Message, error) {
-	start := time.Now()
+func (s *Service) GetMessages(max int, downloadAttachments bool) ([]*inbox.Message, error) {
 	i, err := s.GetInbox()
 	if err != nil {
 		return nil, err
+	}
+
+	var maxMessages int
+	if max == -1 {
+		maxMessages = i.Total
+	} else {
+		maxMessages = max
 	}
 
 	builder := NewURLBuilder(s.URL)
 	builder.SetPath("sg.do")
 	builder.AddParam("PROC", "MESSAGERIE")
 	builder.AddParam("ACTION", "REFRESH_FILTER")
-	builder.AddParam("NB_ELEMENTS", strconv.Itoa(i.Total))
+	builder.AddParam("NB_ELEMENTS", strconv.Itoa(maxMessages))
 	builder.AddParam("FROM_AJAX", "true")
 	builder.AddParam("TYPE_TRI", "DATE_DESC")
 
@@ -156,8 +164,6 @@ func (s *Service) GetMessages(max int) ([]*inbox.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	golog.Debugf(u.String())
 
 	resp, err := s.Post(u)
 	if err != nil {
@@ -171,48 +177,210 @@ func (s *Service) GetMessages(max int) ([]*inbox.Message, error) {
 
 	var messages []*inbox.Message
 	doc.Find("#js_boite_reception li").Each(func(i int, se *goquery.Selection) {
-		if max != -1 && i >= max {
-			return
-		}
-
 		href, _ := se.Find("a").Attr("href")
-
-		//parse href
 		u, err := url.Parse(href)
 		if err != nil {
 			golog.Error(err)
 		}
 
-		builder := NewURLBuilder(s.URL)
-		builder.SetPath("sg.do")
-		builder.AddParams(u.Query())
+		folderID := u.Query().Get("ID_DOSSIER")
+		messageID := u.Query().Get("ID_COMMUNICATION")
 
-		u, err = builder.Build()
-		if err != nil {
-			return
+		content, _ := s.GetMessageContent(messageID, folderID, downloadAttachments)
+
+		messageType := se.Find(".col--xs-1 .cartouche .text--ellipsis").Text()
+
+		message := &inbox.Message{
+			ID:         messageID,
+			FolderID:   folderID,
+			ServiceURL: s.URL.String(),
+			Content:    content,
+			Type:       messageType,
 		}
 
-		get, err := s.Get(u)
-		if err != nil {
-			return
-		}
-
-		m := new(inbox.Message)
-		content, err := goquery.NewDocumentFromReader(get.Body)
-		if err != nil {
-			return
-		}
-
-		m.SetID(u.Query().Get("ID_COMMUNICATION"))
-		m.SetFolderID(u.Query().Get("ID_DOSSIER"))
-		m.SetSubject(content.Find("#titreCommunication").Text())
-
-		messages = append(messages, m)
+		messages = append(messages, message)
 	})
 
-	golog.Infof("Get %d messages in %s", len(messages), time.Since(start))
-
 	return messages, nil
+}
+
+func (s *Service) GetMessageContent(messageID string, folderID string, downloadAttachment bool) (*inbox.MessageContent, error) {
+	builder := NewURLBuilder(s.URL)
+	builder.SetPath("sg.do")
+	builder.AddParam("PROC", "MESSAGERIE")
+	builder.AddParam("ACTION", "CONSULTER_COMMUNICATION")
+	builder.AddParam("ID_COMMUNICATION", messageID)
+	builder.AddParam("ID_DOSSIER", folderID)
+
+	u, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.Get(u)
+	if err != nil {
+		return nil, err
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	content := new(inbox.MessageContent)
+
+	recipients, _ := s.GetMessageRecipients(messageID)
+
+	redactorName := doc.Find("#discussion_message0 > div.row--flex-auto > div.col--full.col--flex-grow > button > div > div.col--gutter-sm.col--flex-grow > div.b-like.text--left")
+	redactorName.Find("span").Remove()
+
+	redactor := doc.Find("#discussion_message0 > div.row--flex-auto > div.col--full.col--flex-grow > button")
+	redactorId := redactor.AttrOr("data-idredacteur", "")
+	redactorNameTxt := strings.TrimSpace(redactorName.Text())
+	redactorType := redactor.AttrOr("data-profilredacteur", "")
+
+	participationId := redactor.AttrOr("data-idparticipation", "")
+
+	redactorInfo, _ := s.GetRedactorInfo(redactorId, participationId, messageID)
+
+	date := doc.Find("#discussion_message0 > div.row--flex-auto > div.col.col--flex-locked.col--full > span:nth-child(1) > time")
+	dateAttr := date.AttrOr("datetime", "")
+	dateTime, _ := time.Parse("2006-01-02T15:04:05.000-07:00", dateAttr)
+
+	groups := doc.Find("#liste-participations-message > div > div.panel.panel--outlined.panel--no-margin > span > span[name='destinataire_groupe']")
+	var groupsName []string
+	groups.Each(func(i int, se *goquery.Selection) {
+		groupsName = append(groupsName, se.Text())
+	})
+
+	doc.Find(".jumbofiles__files li").Each(func(i int, se *goquery.Selection) {
+
+		attachment := new(inbox.Attachment)
+		id, _ := strconv.Atoi(se.AttrOr("data-jumbofiles-id", "0"))
+		size, _ := strconv.Atoi(se.AttrOr("data-jumbofiles-size", "0"))
+		name := se.AttrOr("data-jumbofiles-title", "")
+		extension := se.AttrOr("data-jumbofiles-extension", "")
+
+		attachment.ID = id
+		attachment.MessageID = messageID
+		attachment.Name = name
+		attachment.Size = size
+		attachment.Extension = extension
+
+		if downloadAttachment {
+			data, _ := s.GetAttachment(id)
+
+			if len(data) == attachment.Size {
+				attachment.Data = data
+			}
+		}
+
+		content.Attachments = append(content.Attachments, attachment)
+	})
+
+	content.Subject = doc.Find("#titreCommunication").Text()
+	content.ParticipationID = participationId
+	content.Redactor = &inbox.MessageRedactor{
+		Name: redactorNameTxt,
+		Id:   redactorId,
+		Type: redactorType,
+		Info: redactorInfo,
+	}
+	content.Recipients = recipients
+	content.Groups = groupsName
+	content.Date = &dateTime
+
+	return content, nil
+}
+
+func (s *Service) GetAttachment(attachmentID int) ([]byte, error) {
+	builder := NewURLBuilder(s.URL)
+	builder.SetPath("lectureFichierGlobale.do")
+	builder.AddParam("ID_FICHIER", strconv.Itoa(attachmentID))
+
+	u, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.Get(u)
+	if err != nil {
+		return nil, err
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+// GetRedactorInfo return redactor info
+func (s *Service) GetRedactorInfo(redactorID string, participationID string, messageID string) ([]*inbox.RedactorInfo, error) {
+	builder := NewURLBuilder(s.URL)
+	builder.SetPath("sg.do")
+	builder.AddParam("PROC", "MESSAGERIE")
+	builder.AddParam("ACTION", "AFFICHER_INFOS_DETAILLEES_REDACTEUR")
+	builder.AddParam("ID_PARTICIPATION", participationID)
+	builder.AddParam("ID_COMMUNICATION", messageID)
+	builder.AddParam("ID_REDACTEUR", redactorID)
+
+	u, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.Post(u)
+	if err != nil {
+		return nil, err
+	}
+
+	var infos []*inbox.RedactorInfo
+	err = json.NewDecoder(resp.Body).Decode(&infos)
+	if err != nil {
+		return nil, err
+	}
+
+	return infos, nil
+}
+
+func (s *Service) GetMessageRecipients(communicationID string) ([]*inbox.MessageRecipient, error) {
+	builder := NewURLBuilder(s.URL)
+	builder.SetPath("sg.do")
+	builder.AddParam("PROC", "MESSAGERIE")
+	builder.AddParam("ACTION", "LISTER_DESTINATAIRES_GROUPE")
+	builder.AddParam("ID_COMMUNICATION", communicationID)
+	builder.AddParam("REQUETE_AJAX", "true")
+
+	u, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.Get(u)
+	if err != nil {
+		return nil, err
+	}
+
+	var recipients []*inbox.MessageRecipient
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	doc.Find("li").Each(func(i int, se *goquery.Selection) {
+		rec := new(inbox.MessageRecipient)
+		name := strings.TrimSpace(se.Text())
+
+		split := strings.Split(name, " ")
+
+		if len(split) == 2 {
+			rec.SetLastName(split[0])
+			rec.SetFirstName(split[1])
+		} else {
+			rec.SetFirstName(name)
+		}
+
+		recipients = append(recipients, rec)
+	})
+
+	return recipients, nil
 }
 
 func (s *Service) GetFolderID() (string, error) {
