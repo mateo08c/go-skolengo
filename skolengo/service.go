@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -278,6 +279,13 @@ func (s *Service) GetMessageContent(messageID string, folderID string, downloadA
 		content.Attachments = append(content.Attachments, attachment)
 	})
 
+	body := doc.Find("#discussion_message0 > div.row > div")
+	body.Find(".jumbofiles").Remove()
+
+	regex := regexp.MustCompile(`\n{3,}`)
+	output := regex.ReplaceAllString(strings.TrimSpace(body.Text()), "\n\n")
+
+	content.Body = output
 	content.Subject = doc.Find("#titreCommunication").Text()
 	content.ParticipationID = participationId
 	content.Redactor = &inbox.MessageRedactor{

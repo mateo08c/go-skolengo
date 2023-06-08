@@ -24,6 +24,7 @@ type MessageRecipient struct {
 
 type MessageContent struct {
 	Subject         string              `json:"subject"`
+	Body            string              `json:"body"`
 	ParticipationID string              `json:"participation_id"`
 	Redactor        *MessageRedactor    `json:"sender"`
 	Attachments     []*Attachment       `json:"attachments"`
